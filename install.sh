@@ -18,12 +18,29 @@ echo "[*] Installing CLI symlink to ~/.local/bin/dell-g15-fan..."
 mkdir -p "$HOME/.local/bin"
 ln -sf "$SCRIPT_DIR/main.py" "$HOME/.local/bin/dell-g15-fan"
 
-echo "[*] Installing Desktop Application Launcher..."
+echo "[*] Installing Desktop Application Launcher and Icons..."
 mkdir -p "$HOME/.local/share/applications"
 mkdir -p "$HOME/.local/share/icons/hicolor/256x256/apps"
 
-cp "$SCRIPT_DIR/assets/icon.png" "$HOME/.local/share/icons/hicolor/256x256/apps/dell-g15-fan.png"
-cp "$SCRIPT_DIR/dell-g15-fan.desktop" "$HOME/.local/share/applications/dell-g15-fan.desktop"
+if [ -f "$SCRIPT_DIR/assets/icon.png" ]; then
+    cp "$SCRIPT_DIR/assets/icon.png" "$HOME/.local/share/icons/hicolor/256x256/apps/dell-g15-fan.png"
+fi
+
+# Generate desktop file with absolute executable path fallback
+cat << EOF > "$HOME/.local/share/applications/dell-g15-fan.desktop"
+[Desktop Entry]
+Name=Dell G15 Fan Command Center
+GenericName=Fan & Thermal Controller
+Comment=Monitor temperatures, control fan speeds, and toggle G-Mode Turbo on Dell G15 5520
+Exec=$SCRIPT_DIR/main.py
+Icon=$HOME/.local/share/icons/hicolor/256x256/apps/dell-g15-fan.png
+Terminal=false
+Type=Application
+Categories=System;Settings;HardwareSettings;Utility;
+Keywords=dell;fan;thermal;g15;alienware;g-mode;turbo;cooling;
+StartupNotify=true
+EOF
+
 chmod +x "$HOME/.local/share/applications/dell-g15-fan.desktop"
 
 # Update desktop database if available
@@ -33,9 +50,9 @@ fi
 
 echo ""
 echo "=========================================================================="
-echo "✓ Installation Complete!"
-echo "• Launch GUI from Terminal    : dell-g15-fan (or ./main.py)"
-echo "• Launch CLI Commands         : dell-g15-fan --status"
-echo "• Application Menu Shortcut   : 'Dell G15 Fan Command Center' in App Launcher"
-echo "• Setup Sysfs Permissions     : sudo ./setup_permissions.sh"
+echo "[OK] Installation Complete!"
+echo "  * Launch GUI from Terminal    : dell-g15-fan (or ./main.py)"
+echo "  * Launch CLI Commands         : dell-g15-fan --status"
+echo "  * Application Menu Shortcut   : 'Dell G15 Fan Command Center' in App Launcher"
+echo "  * Setup Sysfs Permissions     : sudo ./setup_permissions.sh"
 echo "=========================================================================="

@@ -24,6 +24,9 @@ SUBSYSTEM=="hwmon", ATTR{name}=="dell_smm", RUN+="/bin/chmod 0666 /sys/class/hwm
 # Platform Profile Nodes
 SUBSYSTEM=="platform-profile", RUN+="/bin/chmod 0666 /sys/class/platform-profile/%k/profile"
 
+# Intel RAPL CPU Package Power Nodes
+SUBSYSTEM=="powercap", RUN+="/bin/chmod -R 0444 /sys/class/powercap/intel-rapl*"
+
 # Global ACPI Platform Profile
 KERNEL=="platform_profile", SUBSYSTEM=="acpi", RUN+="/bin/chmod 0666 /sys/firmware/acpi/platform_profile"
 EOF
@@ -37,5 +40,6 @@ sudo chmod -R a+rw /sys/class/hwmon/hwmon*/fan*_boost 2>/dev/null || true
 sudo chmod -R a+rw /sys/class/hwmon/hwmon*/pwm* 2>/dev/null || true
 sudo chmod -R a+rw /sys/class/platform-profile/*/profile 2>/dev/null || true
 sudo chmod a+rw /sys/firmware/acpi/platform_profile 2>/dev/null || true
+sudo chmod -R a+r /sys/class/powercap/intel-rapl* 2>/dev/null || true
 
-echo "[+] Done! Direct fan control and thermal profile switching are now unlocked."
+echo "[+] Done! Direct fan control, thermal profile switching, and power monitoring are now unlocked."

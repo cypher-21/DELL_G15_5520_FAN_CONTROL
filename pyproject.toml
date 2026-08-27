@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dell-g15-fan"
+version = "2.0.0"
+description = "Industrial-grade hardware fan and thermal control suite for Dell G15 5520 Gaming Laptops on Linux."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+    "PyQt6>=6.4.0",
+    "psutil>=5.9.0",
+]
+
+[project.scripts]
+dell-g15-fan = "main:main"
+dell-g15-fan-gui = "dell_g15_fan_gui:main"
+dell-g15-fan-cli = "dell_g15_fan_cli:main"
+
+[tool.setuptools]
+py-modules = ["main", "dell_fan_backend", "dell_g15_fan_gui", "dell_g15_fan_cli", "fan_curve_engine"]

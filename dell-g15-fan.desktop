@@ -2,8 +2,8 @@
 Name=Dell G15 Fan Command Center
 GenericName=Fan & Thermal Controller
 Comment=Monitor temperatures, control fan speeds, and toggle G-Mode Turbo on Dell G15 5520
-Exec=/home/cypher/Desktop/dellg15_5520_intel_i5/main.py
-Icon=/home/cypher/Desktop/dellg15_5520_intel_i5/assets/icon.png
+Exec=dell-g15-fan
+Icon=dell-g15-fan
 Terminal=false
 Type=Application
 Categories=System;Settings;HardwareSettings;Utility;

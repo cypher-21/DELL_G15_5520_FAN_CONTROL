@@ -282,25 +282,27 @@ class DellFanBackend:
         if self.alienware_profile_path:
             prof = self._read_str(os.path.join(self.alienware_profile_path, "profile"), "balanced")
             data["active_profile"] = prof
-            data["is_g_mode"] = (prof == "performance" and data["fan1_boost"] >= 250) or (prof == "performance")
+            data["is_g_mode"] = (prof == "performance" and data["fan1_boost"] >= 95) or (prof == "performance")
         elif os.path.isfile(self.acpi_profile_path):
             prof = self._read_str(self.acpi_profile_path, "balanced")
             data["active_profile"] = prof
             data["is_g_mode"] = (prof == "performance")
 
         # 5. RAPL CPU Package Power (Watts)
-        rapl_path = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj"
-        if os.path.isfile(rapl_path):
+        rapl_candidates = glob.glob("/sys/class/powercap/intel-rapl*/energy_uj") + glob.glob("/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
+        for rapl_path in rapl_candidates:
             try:
                 e1 = self._read_int(rapl_path)
-                t1_ts = time.time()
-                if self._last_rapl_energy > 0 and self._last_rapl_ts > 0:
-                    dt = t1_ts - self._last_rapl_ts
-                    de = e1 - self._last_rapl_energy
-                    if dt > 0 and de >= 0:
-                        data["cpu_power_w"] = round((de / dt) / 1_000_000.0, 1)
-                self._last_rapl_energy = e1
-                self._last_rapl_ts = t1_ts
+                if e1 > 0:
+                    t1_ts = time.time()
+                    if self._last_rapl_energy > 0 and self._last_rapl_ts > 0:
+                        dt = t1_ts - self._last_rapl_ts
+                        de = e1 - self._last_rapl_energy
+                        if dt > 0 and de >= 0:
+                            data["cpu_power_w"] = round((de / dt) / 1_000_000.0, 1)
+                    self._last_rapl_energy = e1
+                    self._last_rapl_ts = t1_ts
+                    break
             except Exception:
                 pass
 
@@ -343,28 +345,41 @@ class DellFanBackend:
         except Exception:
             return False
 
-    def set_fan_boost(self, fan1_pct: int, fan2_pct: Optional[int] = None) -> bool:
+    def set_fan_boost(self, fan1_pct: int, fan2_pct: Optional[int] = None, sync_profile: bool = True) -> bool:
         """
         Set fan boost percentage (0% to 100%).
-        Maps 0-100% -> 0-255 boost integer for alienware_wmi.
+        Maps 0-100% directly to alienware_wmi sysfs nodes (0-100 scale).
+        When boost > 0, automatically engages 'custom' mode in platform-profile so firmware respects the manual override.
         """
         if fan2_pct is None:
             fan2_pct = fan1_pct
 
-        fan1_pct = max(0, min(100, int(fan1_pct)))
-        fan2_pct = max(0, min(100, int(fan2_pct)))
+        b1 = max(0, min(100, int(fan1_pct)))
+        b2 = max(0, min(100, int(fan2_pct)))
 
-        b1 = int((fan1_pct / 100.0) * 255)
-        b2 = int((fan2_pct / 100.0) * 255)
+        # If user is applying manual boost > 0 and we are not in performance/gmode, switch profile to 'custom'
+        if sync_profile:
+            if b1 > 0 or b2 > 0:
+                cur_prof = self.get_telemetry().get("active_profile", "").lower()
+                if cur_prof not in ["performance", "custom"]:
+                    if self.alienware_profile_path:
+                        self._write_sysfs(os.path.join(self.alienware_profile_path, "profile"), "custom")
+            else:
+                # If both fans set to 0, restore balanced if previously in custom
+                cur_prof = self.get_telemetry().get("active_profile", "").lower()
+                if cur_prof == "custom":
+                    if self.alienware_profile_path:
+                        self._write_sysfs(os.path.join(self.alienware_profile_path, "profile"), "balanced")
 
         success = True
+        # 1. Alienware WMI Fan Boost Nodes (0-100 percentage scale)
         if self.alienware_hwmon:
             p1 = os.path.join(self.alienware_hwmon, "fan1_boost")
             p2 = os.path.join(self.alienware_hwmon, "fan2_boost")
             ok1 = self._write_sysfs(p1, str(b1))
             ok2 = self._write_sysfs(p2, str(b2))
             success = ok1 and ok2
-            
+
         return success
 
     def set_thermal_profile(self, profile: str) -> bool:

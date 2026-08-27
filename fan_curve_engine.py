@@ -48,8 +48,8 @@ class FanCurveEngine:
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         
-        self.polling_interval: float = 2.0  # seconds
-        self.hysteresis_temp: float = 2.5   # degree C buffer to prevent rapid fluctuating
+        self.polling_interval: float = 1.0  # seconds (fast, responsive hardware polling)
+        self.hysteresis_temp: float = 2.0   # degree C buffer to prevent rapid fluctuating
         self._last_applied_pct: int = 0
         self._last_highest_temp: float = 0.0
         

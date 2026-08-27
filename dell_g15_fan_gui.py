@@ -187,13 +187,16 @@ class PrecisionRadialMeter(QtWidgets.QWidget):
 
         # 4. Status Sub-badge (9pt Bold)
         if self.sub_text:
-            badge_w = min(w - 20, 160)
+            font_badge = QFont("DejaVu Sans", 9, QFont.Weight.Bold)
+            fm_badge = QtGui.QFontMetrics(font_badge)
+            text_w = fm_badge.horizontalAdvance(self.sub_text.upper())
+            badge_w = min(w - 10, max(110, text_w + 18))
             badge_rect = QRectF(cx - badge_w / 2.0, cy + r + 30, badge_w, 22)
             painter.setPen(QPen(QColor(COLOR_BORDER), 1))
             painter.setBrush(QBrush(QColor(COLOR_BG_SUB)))
             painter.drawRoundedRect(badge_rect, 3, 3)
             painter.setPen(QColor(COLOR_TEXT_SECONDARY))
-            painter.setFont(QFont("DejaVu Sans", 9, QFont.Weight.Bold))
+            painter.setFont(font_badge)
             painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, self.sub_text.upper())
 
 
@@ -547,7 +550,7 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         brand_title = QtWidgets.QLabel("DELL G15 5520")
         brand_title.setStyleSheet(f"color: {COLOR_ACCENT}; font-size: 18px; font-weight: 900; letter-spacing: 1.5px; font-family: 'DejaVu Sans Mono';")
         
-        brand_sub = QtWidgets.QLabel("Intel Core i5-12500H • NVIDIA GeForce RTX 3050 Mobile")
+        brand_sub = QtWidgets.QLabel("Intel Core i5-12500H • NVIDIA GeForce RTX 3050")
         brand_sub.setStyleSheet(f"color: {COLOR_TEXT_MUTED}; font-size: 12px; font-weight: bold;")
         
         brand_layout.addWidget(brand_title)
@@ -559,12 +562,15 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         # Telemetry Status Readouts (13pt Bold)
         self.badge_freq = QtWidgets.QLabel("CPU -- GHz")
         self.badge_freq.setStyleSheet(f"background: {COLOR_BG_SUB}; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; font-size: 13px; font-weight: bold; font-family: 'DejaVu Sans Mono'; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
+        self.badge_freq.setToolTip("Average CPU Core Clock Frequency and Total Processor Utilization")
         
-        self.badge_power = QtWidgets.QLabel("PKG -- W")
+        self.badge_power = QtWidgets.QLabel("CPU PKG -- W")
         self.badge_power.setStyleSheet(f"background: {COLOR_BG_SUB}; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; font-size: 13px; font-weight: bold; font-family: 'DejaVu Sans Mono'; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
+        self.badge_power.setToolTip("Intel RAPL CPU Package Power (Electrical wattage consumed by CPU cores & uncore)")
         
         self.badge_battery = QtWidgets.QLabel("BAT --%")
         self.badge_battery.setStyleSheet(f"background: {COLOR_BG_SUB}; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; font-size: 13px; font-weight: bold; font-family: 'DejaVu Sans Mono'; border: 1px solid {COLOR_BORDER}; border-radius: 4px;")
+        self.badge_battery.setToolTip("Battery State of Charge and AC Power Adapter Status")
 
         self.btn_perms = QtWidgets.QPushButton("DIRECT CONTROL ACTIVE")
         self.btn_perms.setStyleSheet(f"background: #0f241d; color: {COLOR_SUCCESS}; border: 1px solid #1c523d; font-size: 12px; font-weight: bold; font-family: 'DejaVu Sans Mono'; padding: 6px 14px; border-radius: 4px;")
@@ -689,7 +695,7 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         ctrl_layout.setSpacing(8)
 
         c_top = QtWidgets.QHBoxLayout()
-        c_title = QtWidgets.QLabel("MANUAL FAN BOOST OVERRIDE")
+        c_title = QtWidgets.QLabel("MANUAL FAN BOOST CONTROL")
         c_title.setStyleSheet(f"color: {COLOR_TEXT_MUTED}; font-size: 12px; font-weight: bold; font-family: 'DejaVu Sans Mono';")
         
         self.chk_sync_fans = QtWidgets.QCheckBox("SYNCHRONIZE CHANNELS")
@@ -748,7 +754,7 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         r3.addWidget(lbl_p)
 
         for pct in [0, 25, 50, 75, 100]:
-            name = "AUTO (0%)" if pct == 0 else (f"{pct}% MAX" if pct == 100 else f"{pct}%")
+            name = "AUTO (0%)" if pct == 0 else (f"{pct}% MAX" if pct == 100 else f"{pct}% BOOST")
             btn = QtWidgets.QPushButton(name)
             btn.setStyleSheet(f"""
                 QPushButton {{
@@ -902,8 +908,48 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         self.sensor_tree.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.sensor_tree.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.sensor_tree.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.sensor_tree)
 
+        # Build initial items once to prevent scroll jump and collapse bugs
+        self.sensor_items = {}
+        
+        # Thermal
+        t_root = QtWidgets.QTreeWidgetItem(self.sensor_tree, ["THERMAL ZONES", "Subsystem Overview", "All Active Thermal Zones"])
+        self.sensor_items["cpu_temp"] = QtWidgets.QTreeWidgetItem(t_root, ["", "CPU Package Temperature", "--"])
+        self.sensor_items["gpu_temp"] = QtWidgets.QTreeWidgetItem(t_root, ["", "GPU Core Temperature", "--"])
+        self.sensor_items["ssd_temp"] = QtWidgets.QTreeWidgetItem(t_root, ["", "NVMe SSD Solid State Drive", "--"])
+        self.sensor_items["ram_temp"] = QtWidgets.QTreeWidgetItem(t_root, ["", "DDR5 System RAM Module", "--"])
+        self.sensor_items["ambient_temp"] = QtWidgets.QTreeWidgetItem(t_root, ["", "Motherboard Ambient Sensor", "--"])
+        self.sensor_items["wifi_temp"] = QtWidgets.QTreeWidgetItem(t_root, ["", "Intel Wi-Fi 6 Adapter", "--"])
+        
+        self.core_temp_items = []
+        for i in range(16):
+            c_item = QtWidgets.QTreeWidgetItem(t_root, ["", f"CPU Core #{i} Temperature", "--"])
+            c_item.setHidden(True)
+            self.core_temp_items.append(c_item)
+
+        # Cooling
+        f_root = QtWidgets.QTreeWidgetItem(self.sensor_tree, ["COOLING SUBSYSTEM", "Tachometers", "Active Dual Fan System"])
+        self.sensor_items["fan1_rpm"] = QtWidgets.QTreeWidgetItem(f_root, ["", "CPU Fan Speed", "--"])
+        self.sensor_items["fan1_max"] = QtWidgets.QTreeWidgetItem(f_root, ["", "CPU Fan Maximum Limit", "--"])
+        self.sensor_items["fan1_boost"] = QtWidgets.QTreeWidgetItem(f_root, ["", "CPU Fan Boost Register", "--"])
+        self.sensor_items["fan2_rpm"] = QtWidgets.QTreeWidgetItem(f_root, ["", "GPU Fan Speed", "--"])
+        self.sensor_items["fan2_max"] = QtWidgets.QTreeWidgetItem(f_root, ["", "GPU Fan Maximum Limit", "--"])
+        self.sensor_items["fan2_boost"] = QtWidgets.QTreeWidgetItem(f_root, ["", "GPU Fan Boost Register", "--"])
+
+        # Power & Platform
+        p_root = QtWidgets.QTreeWidgetItem(self.sensor_tree, ["POWER & PLATFORM", "Management Profile", "Dell ACPI / Alienware WMI"])
+        self.sensor_items["active_profile"] = QtWidgets.QTreeWidgetItem(p_root, ["", "Active Thermal Profile", "--"])
+        self.sensor_items["is_g_mode"] = QtWidgets.QTreeWidgetItem(p_root, ["", "G-Mode Turbo Status", "--"])
+        self.sensor_items["cpu_freq"] = QtWidgets.QTreeWidgetItem(p_root, ["", "CPU Core Clock Speed", "--"])
+        self.sensor_items["cpu_load"] = QtWidgets.QTreeWidgetItem(p_root, ["", "CPU Total Utilization", "--"])
+        self.sensor_items["cpu_power"] = QtWidgets.QTreeWidgetItem(p_root, ["", "CPU Package Power Draw", "--"])
+        self.sensor_items["ac_status"] = QtWidgets.QTreeWidgetItem(p_root, ["", "AC Power Adapter", "--"])
+        self.sensor_items["battery_pct"] = QtWidgets.QTreeWidgetItem(p_root, ["", "Battery State of Charge", "--"])
+        self.sensor_items["battery_volt"] = QtWidgets.QTreeWidgetItem(p_root, ["", "Battery Voltage", "--"])
+        self.sensor_items["battery_rate"] = QtWidgets.QTreeWidgetItem(p_root, ["", "Battery Power Flow", "--"])
+
+        self.sensor_tree.expandAll()
+        layout.addWidget(self.sensor_tree)
         return tab
 
     def _init_system_tray(self):
@@ -986,16 +1032,31 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         f2_pct = telem["fan2_pct"]
         f2_boost = telem["fan2_boost"]
 
+        b1_pct = int(f1_boost)
+        b2_pct = int(f2_boost)
+
         sub_c = "NORMAL" if c_temp < 70 else ("ELEVATED" if c_temp < 85 else "HIGH LOAD")
         sub_g = "NORMAL" if g_temp < 65 else ("ELEVATED" if g_temp < 80 else "HIGH LOAD")
 
-        sub_f1 = f"DUTY {f1_pct:.0f}%" + (f" • BOOST {int(f1_boost/255*100)}%" if f1_boost > 0 else "")
-        sub_f2 = f"DUTY {f2_pct:.0f}%" + (f" • BOOST {int(f2_boost/255*100)}%" if f2_boost > 0 else "")
+        sub_f1 = f"MANUAL {b1_pct}%" if f1_boost > 0 else f"AUTO {f1_pct:.0f}%"
+        sub_f2 = f"MANUAL {b2_pct}%" if f2_boost > 0 else f"AUTO {f2_pct:.0f}%"
 
         self.gauge_cpu_temp.set_value(c_temp, peak_c, sub_c)
         self.gauge_gpu_temp.set_value(g_temp, peak_g, sub_g)
         self.gauge_cpu_fan.set_value(f1_rpm, 0.0, sub_f1)
         self.gauge_gpu_fan.set_value(f2_rpm, 0.0, sub_f2)
+
+        # Sync sliders with hardware state if user is not actively dragging
+        if not self.slider_cpu.isSliderDown() and not self.slider_gpu.isSliderDown():
+            self.slider_cpu.blockSignals(True)
+            self.slider_cpu.setValue(b1_pct)
+            self.lbl_cpu_val.setText(f"{b1_pct}%")
+            self.slider_cpu.blockSignals(False)
+
+            self.slider_gpu.blockSignals(True)
+            self.slider_gpu.setValue(b2_pct)
+            self.lbl_gpu_val.setText(f"{b2_pct}%")
+            self.slider_gpu.blockSignals(False)
 
         # 2. Update Live Graph
         self.chart_widget.add_sample(c_temp, g_temp, f1_pct, f2_pct, f1_rpm, f2_rpm)
@@ -1035,52 +1096,80 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         # 5. Tray Tooltip
         self.tray_icon.setToolTip(f"Dell G15 5520 | CPU: {c_temp}°C | GPU: {g_temp}°C | Fans: {f1_rpm}/{f2_rpm} RPM | {prof.upper()}")
 
-        # 6. Sensor Tree
+        # 6. Sensor Tree (In-place update)
         self._refresh_sensor_tree(telem)
 
     def _refresh_sensor_tree(self, telem: dict):
-        self.sensor_tree.clear()
+        if not hasattr(self, "sensor_items"):
+            return
 
-        # Thermal Node
-        t_root = QtWidgets.QTreeWidgetItem(self.sensor_tree, ["THERMAL ZONES", "Subsystem Overview", "All Active Thermal Zones"])
-        QtWidgets.QTreeWidgetItem(t_root, ["", "CPU Package Temperature", f"{telem['cpu_temp']} °C (Peak: {telem['peak_cpu_temp']} °C)"])
-        QtWidgets.QTreeWidgetItem(t_root, ["", "GPU Core Temperature", f"{telem['gpu_temp']} °C (Peak: {telem['peak_gpu_temp']} °C)"])
+        self.sensor_items["cpu_temp"].setText(2, f"{telem['cpu_temp']} °C (Peak: {telem['peak_cpu_temp']} °C)")
+        self.sensor_items["gpu_temp"].setText(2, f"{telem['gpu_temp']} °C (Peak: {telem['peak_gpu_temp']} °C)")
+        
         if telem.get("ssd_temp") is not None:
-            QtWidgets.QTreeWidgetItem(t_root, ["", "NVMe SSD Solid State Drive", f"{telem['ssd_temp']} °C"])
+            self.sensor_items["ssd_temp"].setText(2, f"{telem['ssd_temp']} °C")
+            self.sensor_items["ssd_temp"].setHidden(False)
+        else:
+            self.sensor_items["ssd_temp"].setHidden(True)
+
         if telem.get("ram_temp") is not None:
-            QtWidgets.QTreeWidgetItem(t_root, ["", "DDR5 System RAM Module", f"{telem['ram_temp']} °C"])
+            self.sensor_items["ram_temp"].setText(2, f"{telem['ram_temp']} °C")
+            self.sensor_items["ram_temp"].setHidden(False)
+        else:
+            self.sensor_items["ram_temp"].setHidden(True)
+
         if telem.get("ambient_temp") is not None:
-            QtWidgets.QTreeWidgetItem(t_root, ["", "Motherboard Ambient Sensor", f"{telem['ambient_temp']} °C"])
+            self.sensor_items["ambient_temp"].setText(2, f"{telem['ambient_temp']} °C")
+            self.sensor_items["ambient_temp"].setHidden(False)
+        else:
+            self.sensor_items["ambient_temp"].setHidden(True)
+
         if telem.get("wifi_temp") is not None:
-            QtWidgets.QTreeWidgetItem(t_root, ["", "Intel Wi-Fi 6 Adapter", f"{telem['wifi_temp']} °C"])
-        for i, ct in enumerate(telem.get("core_temps", [])):
-            QtWidgets.QTreeWidgetItem(t_root, ["", f"CPU Core #{i} Temperature", f"{ct} °C"])
+            self.sensor_items["wifi_temp"].setText(2, f"{telem['wifi_temp']} °C")
+            self.sensor_items["wifi_temp"].setHidden(False)
+        else:
+            self.sensor_items["wifi_temp"].setHidden(True)
 
-        # Fan Node
-        f_root = QtWidgets.QTreeWidgetItem(self.sensor_tree, ["COOLING SUBSYSTEM", "Tachometers", "Active Dual Fan System"])
-        QtWidgets.QTreeWidgetItem(f_root, ["", "CPU Fan Speed", f"{telem['fan1_rpm']} RPM ({telem['fan1_pct']}%)"])
-        QtWidgets.QTreeWidgetItem(f_root, ["", "CPU Fan Maximum Limit", f"{telem['fan1_max']} RPM"])
-        QtWidgets.QTreeWidgetItem(f_root, ["", "CPU Fan Boost Register", f"{telem['fan1_boost']} / 255"])
-        QtWidgets.QTreeWidgetItem(f_root, ["", "GPU Fan Speed", f"{telem['fan2_rpm']} RPM ({telem['fan2_pct']}%)"])
-        QtWidgets.QTreeWidgetItem(f_root, ["", "GPU Fan Maximum Limit", f"{telem['fan2_max']} RPM"])
-        QtWidgets.QTreeWidgetItem(f_root, ["", "GPU Fan Boost Register", f"{telem['fan2_boost']} / 255"])
+        core_temps = telem.get("core_temps", [])
+        for i, c_item in enumerate(self.core_temp_items):
+            if i < len(core_temps):
+                c_item.setText(2, f"{core_temps[i]} °C")
+                c_item.setHidden(False)
+            else:
+                c_item.setHidden(True)
 
-        # Power & Platform
-        p_root = QtWidgets.QTreeWidgetItem(self.sensor_tree, ["POWER & PLATFORM", "Management Profile", "Dell ACPI / Alienware WMI"])
-        QtWidgets.QTreeWidgetItem(p_root, ["", "Active Thermal Profile", telem["active_profile"].upper()])
-        QtWidgets.QTreeWidgetItem(p_root, ["", "G-Mode Turbo Status", "ACTIVE (100% Fans)" if telem["is_g_mode"] else "INACTIVE"])
-        QtWidgets.QTreeWidgetItem(p_root, ["", "CPU Core Clock Speed", f"{telem.get('cpu_freq_ghz', 0.0)} GHz"])
-        QtWidgets.QTreeWidgetItem(p_root, ["", "CPU Total Utilization", f"{telem.get('cpu_usage_pct', 0.0)}%"])
-        QtWidgets.QTreeWidgetItem(p_root, ["", "CPU Package Power Draw", f"{telem.get('cpu_power_w', 0.0)} Watts"])
-        QtWidgets.QTreeWidgetItem(p_root, ["", "AC Power Adapter", "Connected" if telem.get("is_ac_online") else "Disconnected"])
+        self.sensor_items["fan1_rpm"].setText(2, f"{telem['fan1_rpm']} RPM ({telem['fan1_pct']}%)")
+        self.sensor_items["fan1_max"].setText(2, f"{telem['fan1_max']} RPM")
+        self.sensor_items["fan1_boost"].setText(2, f"{telem['fan1_boost']}%")
+
+        self.sensor_items["fan2_rpm"].setText(2, f"{telem['fan2_rpm']} RPM ({telem['fan2_pct']}%)")
+        self.sensor_items["fan2_max"].setText(2, f"{telem['fan2_max']} RPM")
+        self.sensor_items["fan2_boost"].setText(2, f"{telem['fan2_boost']}%")
+
+        self.sensor_items["active_profile"].setText(2, telem["active_profile"].upper())
+        self.sensor_items["is_g_mode"].setText(2, "ACTIVE (100% Fans)" if telem["is_g_mode"] else "INACTIVE")
+        self.sensor_items["cpu_freq"].setText(2, f"{telem.get('cpu_freq_ghz', 0.0)} GHz")
+        self.sensor_items["cpu_load"].setText(2, f"{telem.get('cpu_usage_pct', 0.0)}%")
+        self.sensor_items["cpu_power"].setText(2, f"{telem.get('cpu_power_w', 0.0)} Watts")
+        self.sensor_items["ac_status"].setText(2, "Connected" if telem.get("is_ac_online") else "Disconnected")
+
         if telem.get("battery_pct") is not None:
-            QtWidgets.QTreeWidgetItem(p_root, ["", "Battery State of Charge", f"{telem['battery_pct']}%"])
-        if telem.get("battery_voltage_v") is not None:
-            QtWidgets.QTreeWidgetItem(p_root, ["", "Battery Voltage", f"{telem['battery_voltage_v']} Volts"])
-        if telem.get("battery_rate_w") is not None:
-            QtWidgets.QTreeWidgetItem(p_root, ["", "Battery Power Flow", f"{telem['battery_rate_w']} Watts"])
+            self.sensor_items["battery_pct"].setText(2, f"{telem['battery_pct']}%")
+            self.sensor_items["battery_pct"].setHidden(False)
+        else:
+            self.sensor_items["battery_pct"].setHidden(True)
 
-        self.sensor_tree.expandAll()
+        if telem.get("battery_voltage_v") is not None:
+            self.sensor_items["battery_volt"].setText(2, f"{telem['battery_voltage_v']} Volts")
+            self.sensor_items["battery_volt"].setHidden(False)
+        else:
+            self.sensor_items["battery_volt"].setHidden(True)
+
+        if telem.get("battery_rate_w") is not None:
+            self.sensor_items["battery_rate"].setText(2, f"{telem['battery_rate_w']} Watts")
+            self.sensor_items["battery_rate"].setHidden(False)
+        else:
+            self.sensor_items["battery_rate"].setHidden(True)
 
     # -------------------------------------------------------------------------
     # Mode & Fan Actions
@@ -1103,11 +1192,18 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         self.refresh_telemetry()
 
     def _apply_slider_preset(self, pct: int):
+        if self.curve_engine.is_running:
+            self.curve_engine.stop()
+            self.btn_toggle_curve.setChecked(False)
+            self.btn_toggle_curve.setText("ENABLE SMART CURVE")
+            self.btn_toggle_curve.setStyleSheet(f"background: #0f241d; color: {COLOR_SUCCESS}; border: 1px solid #1c523d; padding: 8px 20px; font-weight: bold; font-size: 12px; font-family: 'DejaVu Sans Mono'; border-radius: 4px;")
+
         self.slider_cpu.setValue(pct)
         if self.chk_sync_fans.isChecked():
             self.slider_gpu.setValue(pct)
         self.backend.set_fan_boost(pct, pct)
-        self.status_bar_label.setText(f"FAN BOOST SET: {pct}%")
+        self.status_bar_label.setText(f"MANUAL FAN BOOST APPLIED: {pct}%" if pct > 0 else "FAN CONTROL: AUTOMATIC FIRMWARE")
+        self.refresh_telemetry()
 
     def _on_cpu_slider_changed(self, val: int):
         self.lbl_cpu_val.setText(f"{val}%")
@@ -1119,6 +1215,7 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
             self.backend.set_fan_boost(val, val)
         else:
             self.backend.set_fan_boost(val, self.slider_gpu.value())
+        self.status_bar_label.setText(f"MANUAL FAN BOOST: CPU {val}%" if val > 0 else "FAN CONTROL: AUTOMATIC FIRMWARE")
 
     def _on_gpu_slider_changed(self, val: int):
         self.lbl_gpu_val.setText(f"{val}%")
@@ -1130,6 +1227,7 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
             self.backend.set_fan_boost(val, val)
         else:
             self.backend.set_fan_boost(self.slider_cpu.value(), val)
+        self.status_bar_label.setText(f"MANUAL FAN BOOST: GPU {val}%" if val > 0 else "FAN CONTROL: AUTOMATIC FIRMWARE")
 
     # -------------------------------------------------------------------------
     # Fan Curve Engine Actions

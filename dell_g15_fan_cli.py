@@ -81,8 +81,8 @@ def print_status(backend: DellFanBackend):
     f2_bar = render_bar(f2_pct)
 
     print(f"\n{BOLD}Cooling Fans :{RESET}")
-    print(f"   * CPU Fan : {BOLD}{f1_rpm} RPM{RESET} ({f1_pct}%) [Boost: {int(f1_boost/255*100)}%] {f1_bar}")
-    print(f"   * GPU Fan : {BOLD}{f2_rpm} RPM{RESET} ({f2_pct}%) [Boost: {int(f2_boost/255*100)}%] {f2_bar}")
+    print(f"   * CPU Fan : {BOLD}{f1_rpm} RPM{RESET} ({f1_pct}%) [Boost: {f1_boost}%] {f1_bar}")
+    print(f"   * GPU Fan : {BOLD}{f2_rpm} RPM{RESET} ({f2_pct}%) [Boost: {f2_boost}%] {f2_bar}")
 
     # Permissions
     print(f"\n{BOLD}Hardware Access Status :{RESET}")
@@ -114,6 +114,9 @@ SUBSYSTEM=="hwmon", ATTR{name}=="dell_smm", RUN+="/bin/chmod 0666 /sys/class/hwm
 # Platform Profile Nodes
 SUBSYSTEM=="platform-profile", RUN+="/bin/chmod 0666 /sys/class/platform-profile/%k/profile"
 
+# Intel RAPL CPU Package Power Nodes
+SUBSYSTEM=="powercap", RUN+="/bin/chmod -R 0444 /sys/class/powercap/intel-rapl*"
+
 # Global ACPI Platform Profile
 KERNEL=="platform_profile", SUBSYSTEM=="acpi", RUN+="/bin/chmod 0666 /sys/firmware/acpi/platform_profile"
 """
@@ -123,7 +126,7 @@ KERNEL=="platform_profile", SUBSYSTEM=="acpi", RUN+="/bin/chmod 0666 /sys/firmwa
         f.write(rules_content)
 
     print(f"{CYAN}Installing udev rule for passwordless fan control...{RESET}")
-    cmd = f"cp {rule_file} {target_path} && udevadm control --reload-rules && udevadm trigger && chmod -R a+rw /sys/class/hwmon/hwmon*/fan*_boost 2>/dev/null; chmod -R a+rw /sys/class/platform-profile/*/profile 2>/dev/null; chmod a+rw /sys/firmware/acpi/platform_profile 2>/dev/null"
+    cmd = f"cp {rule_file} {target_path} && udevadm control --reload-rules && udevadm trigger && chmod -R a+rw /sys/class/hwmon/hwmon*/fan*_boost 2>/dev/null; chmod -R a+rw /sys/class/platform-profile/*/profile 2>/dev/null; chmod a+rw /sys/firmware/acpi/platform_profile 2>/dev/null; chmod -R a+r /sys/class/powercap/intel-rapl* 2>/dev/null"
     
     import subprocess
     res = subprocess.run(["pkexec", "sh", "-c", cmd])
