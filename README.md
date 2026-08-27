@@ -4,10 +4,13 @@ A high-performance hardware fan controller, thermal profile manager, and telemet
 
 This utility brings complete Alienware Command Center (AWCC) functionality to Linux, restoring native **G-Mode Turbo (Game Shift 100% Fans)**, direct dual-fan manual boost sliders, intelligent background fan curves with hysteresis protection, and comprehensive hardware sensor telemetry.
 
+![Dell G15 5520 Thermal Command Center Dashboard](assets/dashboard_preview.png)
+
 ---
 
 ## Table of Contents
 
+- [Screenshots & Interface Overview](#screenshots--interface-overview)
 - [Features](#features)
 - [System Requirements](#system-requirements)
 - [Installation Guide](#installation-guide)
@@ -20,6 +23,26 @@ This utility brings complete Alienware Command Center (AWCC) functionality to Li
 - [Architecture & Linux Kernel Interface](#architecture--linux-kernel-interface)
 - [Troubleshooting & FAQ](#troubleshooting--faq)
 - [License](#license)
+
+---
+
+## Screenshots & Interface Overview
+
+### 1. Main Dashboard
+Real-time thermal monitoring, dual-fan RPM tachometers, operating profile switcher (`Quiet`, `Balanced`, `Performance`, `Custom`, `G-Mode Turbo`), manual boost sliders, and live oscilloscope telemetry timeline.
+
+![Main Dashboard](assets/dashboard_preview.png)
+
+### 2. Smart Fan Curve Controller
+Configurable dynamic fan curve editor with interpolation, hysteresis surge protection, and preset profiles.
+
+![Fan Curves](assets/curves_preview.png)
+
+### 3. Hardware Sensor Telemetry Tree
+High-density hierarchical tree displaying all CPU package & per-core temperatures, GPU, NVMe SSD, DDR5 RAM, ambient chassis sensor, package power wattage, and battery flow.
+
+![Hardware Sensors](assets/sensors_preview.png)
+
 
 ---
 
