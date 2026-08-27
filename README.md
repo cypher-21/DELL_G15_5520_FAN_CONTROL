@@ -1,8 +1,8 @@
 # Dell G15 5520 Thermal & Fan Command Center for Linux
 
-A high-performance hardware fan controller, thermal profile manager, and telemetry monitor engineered specifically for the **Dell G15 5520** (Intel Core i5-12500H / i7-12700H + NVIDIA GeForce RTX 3050 / 3060) running Linux.
+A comprehensive, industrial-grade hardware fan controller, thermal profile manager, and telemetry monitor engineered specifically for the **Dell G15 5520** (Intel Core i5-12500H / i7-12700H + NVIDIA GeForce RTX 3050 / 3060) and compatible Dell G-Series / Alienware laptops on Linux.
 
-This utility brings complete Alienware Command Center (AWCC) functionality to Linux, restoring native **G-Mode Turbo (Game Shift 100% Fans)**, direct dual-fan manual boost sliders, intelligent background fan curves with hysteresis protection, and comprehensive hardware sensor telemetry.
+This utility brings complete Alienware Command Center (AWCC) functionality to Linux, restoring native **G-Mode Turbo (Game Shift 100% Fans)**, direct dual-fan manual boost controls, intelligent background fan curves with hysteresis protection, power-source auto-adaptation, on-screen OSD notifications, and comprehensive hardware sensor telemetry.
 
 ![Dell G15 5520 Thermal Command Center Dashboard](assets/dashboard_preview.png)
 
@@ -11,16 +11,22 @@ This utility brings complete Alienware Command Center (AWCC) functionality to Li
 ## Table of Contents
 
 - [Screenshots & Interface Overview](#screenshots--interface-overview)
-- [Features](#features)
+- [Key Features](#key-features)
+- [How It Works (Hardware & Linux Kernel Architecture)](#how-it-works-hardware--linux-kernel-architecture)
 - [System Requirements](#system-requirements)
 - [Installation Guide](#installation-guide)
-- [Setting Up Direct Permissions](#setting-up-direct-permissions)
-- [Launching the Application](#launching-the-application)
+  - [Option 1: Debian / Ubuntu / Kali Linux (.deb Package)](#option-1-debian--ubuntu--kali-linux-deb-package-recommended)
+  - [Option 2: Arch Linux / Manjaro (AUR PKGBUILD)](#option-2-arch-linux--manjaro-aur-pkgbuild)
+  - [Option 3: Python PIP Package](#option-3-python-pip-package)
+  - [Option 4: Manual Script Installation](#option-4-manual-script-installation)
+- [Setting Up Direct Hardware Permissions (Passwordless Operation)](#setting-up-direct-hardware-permissions-passwordless-operation)
+- [Graphical Interface (GUI) Guide](#graphical-interface-gui-guide)
 - [Command-Line (CLI) Reference](#command-line-cli-reference)
+- [Headless Background Daemon & Systemd Service](#headless-background-daemon--systemd-service)
 - [Binding the G-Key (Fn + F9) in Linux](#binding-the-g-key-fn--f9-in-linux)
-- [Smart Fan Curve Engine](#smart-fan-curve-engine)
+- [Smart Fan Curve Engine & Auto Power Adaptation](#smart-fan-curve-engine--auto-power-adaptation)
 - [Monitored Hardware Sensors](#monitored-hardware-sensors)
-- [Architecture & Linux Kernel Interface](#architecture--linux-kernel-interface)
+- [Uninstallation Guide](#uninstallation-guide)
 - [Troubleshooting & FAQ](#troubleshooting--faq)
 - [License](#license)
 
@@ -29,24 +35,23 @@ This utility brings complete Alienware Command Center (AWCC) functionality to Li
 ## Screenshots & Interface Overview
 
 ### 1. Main Dashboard
-Real-time thermal monitoring, dual-fan RPM tachometers, operating profile switcher (`Quiet`, `Balanced`, `Performance`, `Custom`, `G-Mode Turbo`), manual boost sliders, and live oscilloscope telemetry timeline.
+Real-time thermal monitoring, dual-fan RPM tachometers, operating profile switcher (`Quiet`, `Balanced`, `Performance`, `Custom`, `G-Mode Turbo`), manual boost sliders, auto power-source adaptation, and live oscilloscope telemetry timeline.
 
 ![Main Dashboard](assets/dashboard_preview.png)
 
 ### 2. Smart Fan Curve Controller
-Configurable dynamic fan curve editor with interpolation, hysteresis surge protection, and preset profiles.
+Configurable dynamic fan curve editor with linear interpolation, hysteresis surge protection, and preset profiles.
 
 ![Fan Curves](assets/curves_preview.png)
 
 ### 3. Hardware Sensor Telemetry Tree
-High-density hierarchical tree displaying all CPU package & per-core temperatures, GPU, NVMe SSD, DDR5 RAM, ambient chassis sensor, package power wattage, and battery flow.
+High-density hierarchical tree displaying CPU package & per-core temperatures, GPU, NVMe SSD, DDR5 RAM, ambient chassis sensor, Intel RAPL package power wattage, and battery flow.
 
 ![Hardware Sensors](assets/sensors_preview.png)
 
-
 ---
 
-## Features
+## Key Features
 
 - **Thermal Profile Switching**:
   - **Quiet Mode**: Low acoustic profile and lowered fan thresholds for quiet office/library environments.
@@ -54,6 +59,13 @@ High-density hierarchical tree displaying all CPU package & per-core temperature
   - **Performance Mode**: Unlocks higher power envelopes and aggressive fan curves.
   - **G-Mode Turbo (Game Shift)**: 1-Click hardware toggle that pins CPU and GPU fans to 100% boost (~4000 RPM CPU / ~4300 RPM GPU) for maximum cooling under intense gaming/workloads.
   - **Custom Mode**: Independent manual fan boost sliders (0% to 100%).
+- **Headless Smart Fan Curve Background Daemon & Systemd Service**:
+  - Run as a headless console daemon (`dell-g15-fan --daemon`) or as a systemd user service (`dell-g15-fan --service-install`) that auto-starts on system boot.
+- **Desktop OSD Notifications**:
+  - Instant on-screen alerts when pressing the physical G-Key (Fn + F9) or switching thermal profiles.
+  - Critical thermal surge safety popups if temperatures exceed 95 deg C for more than 5 consecutive seconds.
+- **Intelligent Auto Power-Source Adaptation**:
+  - Dynamically switches to `Quiet / Power-Saver` mode when unplugging AC power (Battery) to maximize battery life, and automatically restores `Balanced` mode when connected to AC main power.
 - **Precision Hardware Tachometers & Telemetry**:
   - Live RPM tachometers for both CPU and GPU cooling fans with animated turbine indicators.
   - Instantaneous dual-core thermal meters with peak temperature tracking.
@@ -61,7 +73,7 @@ High-density hierarchical tree displaying all CPU package & per-core temperature
   - Real-time oscilloscope sparkline graph tracking temperatures and fan speeds.
 - **Smart Fan Curve Engine**:
   - Background loop calculating dynamic fan speeds via linear interpolation.
-  - Built-in hysteresis protection (2.5 deg C threshold) to eliminate annoying fan pulsing/cycling.
+  - Built-in hysteresis protection (2.0 deg C threshold) to eliminate annoying fan pulsing/cycling.
   - Built-in presets (*Silent/Stealth*, *Balanced Dynamic*, *Aggressive Performance*, *Maximum Turbo*) plus an editable 5-point threshold table.
 - **System Tray Integration**:
   - Minimizes to the system tray with live temperature/RPM tooltips and a right-click quick menu.
@@ -69,54 +81,114 @@ High-density hierarchical tree displaying all CPU package & per-core temperature
   - Fast, scriptable command-line interface with formatted ASCII telemetry tables.
   - One-command G-Mode toggle designed for global keyboard shortcut integration.
 - **Passwordless Sysfs Operation**:
-  - Includes automated udev rules so non-root users can adjust fan speeds and profiles without password prompts.
+  - Includes automated udev rules so non-root users can adjust fan speeds, monitor RAPL package power, and switch profiles without password prompts.
+
+---
+
+## How It Works (Hardware & Linux Kernel Architecture)
+
+The application communicates directly with Dell's Embedded Controller (EC) via Linux kernel sysfs and ACPI drivers:
+
+```text
++-------------------------------------------------------------------------+
+|                  Dell G15 Fan Command Center Suite                      |
+|      (PyQt6 GUI  /  CLI Engine  /  Fan Curve Daemon  /  Systemd Unit)   |
++------------------------------------+------------------------------------+
+                                     |
+                     +---------------+---------------+
+                     |   DellFanBackend Controller   |
+                     +---------------+---------------+
+                                     |
+        +----------------------------+----------------------------+
+        |                            |                            |
+        v                            v                            v
++--------------------+      +--------------------+      +--------------------+
+|   alienware_wmi    |      |      dell_smm      |      |      ACPI WMI      |
+|    (fan*_boost)    |      |    (tachometers)   |      |  platform-profile  |
++--------------------+      +--------------------+      +--------------------+
+        |                            |                            |
+        +----------------------------+----------------------------+
+                                     |
+                                     v
+                     +-------------------------------+
+                     |    Dell G15 5520 Hardware     |
+                     | (Dual Fans, EC, Thermal Zones)|
+                     +-------------------------------+
+```
+
+### Hardware Register Mapping:
+- **Fan Boost Registers**: `/sys/class/hwmon/hwmon5/fan1_boost` and `fan2_boost` (Native integer range `0 to 100%`).
+- **Fan Tachometers**: `/sys/class/hwmon/hwmon7/fan1_input` (CPU RPM) and `fan2_input` (GPU RPM).
+- **Thermal Profiles**: `/sys/class/platform-profile/platform-profile-0/profile` (`quiet`, `balanced`, `balanced-performance`, `performance`, `custom`).
+- **CPU Package Power**: `/sys/class/powercap/intel-rapl*/energy_uj` (Calculated real-time wattage consumed by Intel CPU Package).
 
 ---
 
 ## System Requirements
 
-- **Supported Laptops**: Dell G15 5520, 5521, 5525 (and compatible Alienware/Dell G-Series laptops).
-- **Supported Linux Distributions**: Kali Linux, Debian, Ubuntu, Linux Mint, Fedora, Arch Linux, Pop!_OS.
+- **Supported Laptops**: Dell G15 5520, 5521, 5525 (and compatible Alienware / Dell G-Series laptops).
+- **Supported Linux Distributions**: Kali Linux, Debian, Ubuntu, Linux Mint, Fedora, Arch Linux, Pop!_OS, Manjaro.
 - **Kernel Requirement**: Linux Kernel 5.15+ (Kernel 6.x recommended with `alienware_wmi` and `dell_smm_hwmon` loaded).
-- **Python**: Python 3.10 or newer.
+- **Python**: Python 3.8 or newer.
 
 ---
 
 ## Installation Guide
 
-### Step 1: Install System Dependencies
+### Option 1: Debian / Ubuntu / Kali Linux (`.deb` Package) (Recommended)
 
-#### Debian / Ubuntu / Kali Linux:
+Build and install the standalone `.deb` package with one command:
+
+```bash
+git clone https://github.com/cypher-21/DELL_G15_5520_FAN_CONTROL.git
+cd DELL_G15_5520_FAN_CONTROL
+./build_deb.sh
+sudo apt install ./dell-g15-fan_2.0.0_all.deb
+```
+
+---
+
+### Option 2: Arch Linux / Manjaro (AUR PKGBUILD)
+
+```bash
+git clone https://github.com/cypher-21/DELL_G15_5520_FAN_CONTROL.git
+cd DELL_G15_5520_FAN_CONTROL
+makepkg -si
+```
+
+---
+
+### Option 3: Python PIP Package
+
+```bash
+git clone https://github.com/cypher-21/DELL_G15_5520_FAN_CONTROL.git
+cd DELL_G15_5520_FAN_CONTROL
+pip install .
+```
+
+---
+
+### Option 4: Manual Script Installation
+
+#### 1. Install Dependencies:
+
+##### Debian / Ubuntu / Kali Linux:
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-pyqt6 python3-psutil git
+sudo apt install -y python3 python3-pyqt6 python3-psutil libnotify-bin git
 ```
 
-#### Arch Linux / Manjaro:
+##### Arch Linux / Manjaro:
 ```bash
-sudo pacman -S python python-pyqt6 python-psutil git
+sudo pacman -S python python-pyqt6 python-psutil libnotify git
 ```
 
-#### Fedora / RHEL:
+##### Fedora / RHEL:
 ```bash
-sudo dnf install -y python3 python3-pyqt6 python3-psutil git
+sudo dnf install -y python3 python3-pyqt6 python3-psutil libnotify git
 ```
 
----
-
-### Step 2: Clone the Repository
-
-```bash
-git clone https://github.com/your-username/dell-g15-fan-controller.git
-cd dell-g15-fan-controller
-```
-
----
-
-### Step 3: Run the Installer
-
-Run the automated installer script to set up execution permissions, desktop shortcuts, and the CLI executable:
-
+#### 2. Run the Installer:
 ```bash
 chmod +x install.sh setup_permissions.sh main.py dell_g15_fan_cli.py dell_g15_fan_gui.py
 ./install.sh
@@ -124,33 +196,32 @@ chmod +x install.sh setup_permissions.sh main.py dell_g15_fan_cli.py dell_g15_fa
 
 ---
 
-## Setting Up Direct Permissions
+## Setting Up Direct Hardware Permissions (Passwordless Operation)
 
-By default, writing to Linux `/sys/class/hwmon/` fan boost nodes and `/sys/class/platform-profile/` requires root privileges.
-
-To allow the application to adjust fan speeds and profiles in real time without prompting for your `sudo` password on every slider drag:
+To allow the application to adjust fan speeds, monitor Intel RAPL CPU power, and switch profiles without prompting for `sudo` on every action:
 
 ```bash
 sudo ./setup_permissions.sh
 ```
 
-This installs `/etc/udev/rules.d/99-dell-g15-fan.rules` and updates live sysfs permissions permanently across reboots.
+This installs `/etc/udev/rules.d/99-dell-g15-fan.rules` and permanently configures hardware permissions across system reboots.
 
 ---
 
-## Launching the Application
+## Graphical Interface (GUI) Guide
 
-### 1. From Desktop Application Menu
-Open your desktop launcher (GNOME Activities, XFCE Menu, KDE Launcher) and search for **"Dell G15 Fan Command Center"**.
-
-### 2. From the Terminal
+### Launching the GUI:
 ```bash
-# Using the installed symlink
+# Using the desktop launcher or terminal command:
 dell-g15-fan
-
-# Or directly from the cloned repository
-python3 main.py
 ```
+
+### Dashboard Features:
+1. **Operating Profile Bar**: Switch between `QUIET`, `BALANCED`, `PERFORMANCE`, `CUSTOM`, and `G-MODE TURBO`.
+2. **Radial Precision Gauges**: View real-time CPU & GPU core temperatures, fan RPM speeds, and active boost modes.
+3. **Manual Fan Boost Faders**: Drag sliders to set direct boost levels (0% to 100%) or click quick presets (`AUTO`, `25% BOOST`, `50% BOOST`, `75% BOOST`, `100% MAX`).
+4. **Auto Power-Source Adaptation**: Check `AUTO AC/BATTERY` to enable automatic profile switching when plugging/unplugging the power cord.
+5. **Live Oscilloscope Chart**: Visualizes temperature trends and fan activity over the last 60 seconds.
 
 ---
 
@@ -163,48 +234,27 @@ The CLI utility provides fast, scriptable control over all hardware functions wi
 | Flag | Argument | Description |
 |---|---|---|
 | `-s`, `--status` | None | Display complete formatted ASCII telemetry table |
-| `-g`, `--gmode-toggle` | None | Instant toggle between G-Mode Turbo (100% fans) and Balanced |
+| `-g`, `--gmode-toggle` | None | Instant toggle between G-Mode Turbo (100% fans) and Balanced (with OSD popup) |
 | `--gmode-on` | None | Force G-Mode Turbo ON (100% fan boost) |
 | `--gmode-off` | None | Force G-Mode Turbo OFF (return to Balanced profile) |
 | `-m`, `--mode` | `quiet` / `balanced` / `performance` / `custom` | Set ACPI platform thermal profile |
-| `-f`, `--fan` | `0` - `100` | Set boost percentage for both CPU and GPU fans |
+| `-f`, `--fan` | `0` - `100` | Set boost percentage for both CPU and GPU fans (0-100%) |
 | `--cpu-fan` | `0` - `100` | Set CPU fan boost percentage independently |
 | `--gpu-fan` | `0` - `100` | Set GPU fan boost percentage independently |
+| `--daemon` | None | Run headless smart fan curve engine in console |
+| `--curve-preset` | Preset Name | Select curve profile for daemon (`Silent / Stealth`, `Balanced Curve`, `Aggressive Cooling`) |
+| `--service-install` | None | Install and enable systemd user service (auto-starts on boot) |
+| `--service-status` | None | Check status of systemd user service |
+| `--service-remove` | None | Stop and remove systemd user service |
+| `--notify` | None | Test desktop OSD notification |
 | `--monitor` | None | Live terminal dashboard updating every 1.5 seconds |
-| `--install-rules` | None | Install udev permissions rules (requires sudo) |
-| `--gui` | None | Launch graphical interface |
+| `--install-rules` | None | Install udev permissions rules (passwordless sysfs access) |
 
 ### CLI Examples
 
-#### Check Live System Status:
+#### Check System Status:
 ```bash
 dell-g15-fan --status
-```
-*Output:*
-```text
-================================================================
-             DELL G15 5520 THERMAL & FAN COMMAND CENTER         
-================================================================
-
-Thermal Profile : BALANCED  [ NORMAL ]
-CPU Processor   : 2.10 GHz | Load: 15% | Package Power: 24.5 W
-Power Source    : Connected (AC) (Battery: 54% (12.26V) • Discharge: 32.9W)
-
-Thermal Sensors :
-   * CPU Package Temperature : 50.0 deg C (Peak: 50.0 deg C)
-   * GPU Core Temperature    : 50.0 deg C (Peak: 50.0 deg C)
-   * NVMe SSD Drive          : 37.9 deg C
-   * DDR5 System RAM         : 49.0 deg C
-   * Motherboard Ambient     : 51.0 deg C
-
-Cooling Fans :
-   * CPU Fan : 1839 RPM (46.0%) [Boost: 0%] [#########...........]
-   * GPU Fan : 1979 RPM (46.0%) [Boost: 0%] [#########...........]
-
-Hardware Access Status :
-   * Fan Boost Control : Direct Access Active
-   * Platform Profile  : Active
-================================================================
 ```
 
 #### Toggle G-Mode Turbo:
@@ -214,27 +264,45 @@ dell-g15-fan --gmode-toggle
 
 #### Set Manual Fan Speed:
 ```bash
-# Set both fans to 75%
-dell-g15-fan --fan 75
+# Set both fans to 50% boost
+dell-g15-fan --fan 50
 
-# Set CPU fan to 50% and GPU fan to 90%
-dell-g15-fan --cpu-fan 50 --gpu-fan 90
-
-# Reset back to automatic firmware control
+# Return fans to automatic firmware curve
 dell-g15-fan --fan 0
 ```
 
-#### Set Operating Profile:
+---
+
+## Headless Background Daemon & Systemd Service
+
+You can run the intelligent fan curve controller in the background without needing the graphical window open.
+
+### 1. Enable Systemd Service (Auto-Start on Boot)
+
 ```bash
-dell-g15-fan --mode quiet
-dell-g15-fan --mode performance
+dell-g15-fan --service-install
+```
+
+### 2. Check Service Status & Logs
+
+```bash
+dell-g15-fan --service-status
+
+# Or view live systemd logs
+journalctl --user -u dell-g15-fan -f
+```
+
+### 3. Stop and Remove Service
+
+```bash
+dell-g15-fan --service-remove
 ```
 
 ---
 
 ## Binding the G-Key (Fn + F9) in Linux
 
-You can configure your laptop's physical **G-Key** (or any custom keyboard shortcut) to toggle G-Mode Turbo instantly just like in Windows.
+You can configure your laptop's physical **G-Key** (or any custom keyboard shortcut) to toggle G-Mode Turbo instantly with native on-screen OSD popup alerts.
 
 ### GNOME / Kali / Ubuntu:
 1. Open **Settings** -> **Keyboard** -> **Keyboard Shortcuts** -> **View and Customize Shortcuts** -> **Custom Shortcuts**.
@@ -259,18 +327,15 @@ bindsym F9 exec --no-startup-id dell-g15-fan --gmode-toggle
 
 ---
 
-## Smart Fan Curve Engine
+## Smart Fan Curve Engine & Auto Power Adaptation
 
-The built-in Smart Fan Curve Engine operates as a lightweight background daemon that continuously computes target fan speeds based on real-time CPU and GPU temperatures.
+The built-in Smart Fan Curve Engine operates as a lightweight background thread or daemon that continuously computes target fan speeds based on real-time CPU and GPU temperatures.
 
-### How it Works:
+### Key Capabilities:
 1. **Linear Interpolation**: Computes the exact fan speed between defined temperature thresholds.
-2. **Hysteresis Algorithm**: Incorporates a 2.5 deg C deadband. Fans will immediately ramp up when temperature rises past a threshold, but will only step down once the temperature drops at least 2.5 deg C below the threshold. This eliminates fan surging/pulsing.
-3. **Preset Profiles**:
-   - **Silent / Stealth**: Optimized for silent acoustic operation (fans remain low until 70 deg C).
-   - **Balanced Dynamic**: Smooth everyday computing balance.
-   - **Aggressive Performance**: Early ramp-up for sustained CPU/GPU rendering and compiling.
-   - **Maximum Turbo**: Aggressive high-duty cooling.
+2. **Hysteresis Algorithm**: Incorporates a 2.0 deg C deadband. Fans immediately ramp up when temperature rises, but only step down once temperature drops past the buffer threshold, preventing annoying cycling.
+3. **Auto Power-Source Adaptation**: Dynamically switches to quiet thermal profiles on battery power to extend battery runtime, and restores full performance curves when connected to AC main power.
+4. **Thermal Surge Safety**: Automatically alerts the user via desktop OSD notifications if temperatures exceed 95 deg C.
 
 ---
 
@@ -282,7 +347,7 @@ The application monitors all available hardware sensors exposed by the Linux ker
 |---|---|---|
 | **CPU Package & Cores** | `coretemp` (`hwmon3`) | Package temperature, Per-Core temps (#0 to #11), Peak tracking |
 | **GPU Core** | `dell_smm` (`hwmon7`) / NVIDIA sysfs | Live temperature, Peak tracking |
-| **Cooling Fans** | `alienware_wmi` (`hwmon5`) & `dell_smm` (`hwmon7`) | Fan 1 (CPU) RPM, Fan 2 (GPU) RPM, Boost registers (0-255) |
+| **Cooling Fans** | `alienware_wmi` (`hwmon5`) & `dell_smm` (`hwmon7`) | Fan 1 (CPU) RPM, Fan 2 (GPU) RPM, Boost registers (0-100%) |
 | **Solid State Drive** | `nvme` (`hwmon1`) | NVMe SSD composite temperature |
 | **System Memory** | `spd5118` (`hwmon4`) | DDR5 System RAM thermal sensor |
 | **Motherboard Ambient** | `dell_smm` (`hwmon7`) | Chassis ambient thermal zone |
@@ -292,75 +357,38 @@ The application monitors all available hardware sensors exposed by the Linux ker
 
 ---
 
-## Architecture & Linux Kernel Interface
+## Uninstallation Guide
 
-The application interacts directly with Linux kernel sysfs nodes and ACPI interfaces:
+To completely remove the application, desktop shortcuts, application icons, systemd user services, and udev rules:
 
-```text
-+-------------------------------------------------------------+
-|               Dell G15 Fan Command Center                   |
-|           (PyQt6 GUI  /  CLI Engine  /  Fan Curve)          |
-+------------------------------+------------------------------+
-                               |
-               +---------------+---------------+
-               |   DellFanBackend Controller   |
-               +---------------+---------------+
-                               |
-       +-----------------------+-----------------------+
-       |                       |                       |
-       v                       v                       v
-+---------------+      +---------------+      +----------------+
-| alienware_wmi |      |   dell_smm    |      |    ACPI WMI    |
-| (fan*_boost)  |      |  (tachometers)|      |platform-profile|
-+---------------+      +---------------+      +----------------+
-       |                       |                       |
-       +-----------------------+-----------------------+
-                               |
-                               v
-               +-------------------------------+
-               |    Dell G15 5520 Hardware     |
-               | (Dual Fans, EC, Thermal Zones)|
-               +-------------------------------+
+### Automated Removal:
+```bash
+./uninstall.sh
 ```
 
-- **Fan Boost**: `/sys/class/hwmon/hwmon5/fan1_boost` and `fan2_boost` (Integer range 0-255).
-- **Fan Tachometers**: `/sys/class/hwmon/hwmon7/fan1_input` and `fan2_input` (RPM).
-- **Thermal Profiles**: `/sys/class/platform-profile/platform-profile-0/profile` (`quiet`, `balanced`, `balanced-performance`, `performance`, `custom`).
+### If Installed via `.deb` Package:
+```bash
+sudo apt remove dell-g15-fan
+```
+
+### If Installed via Arch Linux AUR:
+```bash
+sudo pacman -R dell-g15-fan
+```
 
 ---
 
 ## Troubleshooting & FAQ
 
 ### 1. Fans are not responding to manual sliders
-- Make sure you ran `sudo ./setup_permissions.sh` to grant non-root access to the sysfs boost nodes.
-- Verify that the `alienware_wmi` kernel module is loaded:
-  ```bash
-  lsmod | grep alienware_wmi
-  ```
-  If not loaded, load it with:
-  ```bash
-  sudo modprobe alienware_wmi
-  ```
+- Run `sudo ./setup_permissions.sh` to grant non-root access to the sysfs boost nodes.
+- Verify that `alienware_wmi` is loaded: `lsmod | grep alienware_wmi`. If not, load it: `sudo modprobe alienware_wmi`.
 
 ### 2. RPM reading shows 0 RPM
-- The fan tachometer requires the `dell_smm_hwmon` kernel module. Check if it is active:
-  ```bash
-  lsmod | grep dell_smm_hwmon
-  ```
-  To load it:
-  ```bash
-  sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
-  ```
+- The fan tachometer requires the `dell_smm_hwmon` kernel module. Check if active: `lsmod | grep dell_smm_hwmon`. If not, load it: `sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1`.
 
-### 3. How do I uninstall?
-To remove the application shortcut and CLI symlink:
-```bash
-rm -f ~/.local/bin/dell-g15-fan
-rm -f ~/.local/share/applications/dell-g15-fan.desktop
-rm -f ~/.local/share/icons/hicolor/256x256/apps/dell-g15-fan.png
-sudo rm -f /etc/udev/rules.d/99-dell-g15-fan.rules
-sudo udevadm control --reload-rules
-```
+### 3. CPU Package Power shows `-- W`
+- Run `sudo ./setup_permissions.sh` to grant non-root read access to `/sys/class/powercap/intel-rapl*`.
 
 ---
 

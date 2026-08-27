@@ -48,11 +48,15 @@ if command -v update-desktop-database > /dev/null 2>&1; then
     update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 fi
 
+echo "[*] Configuring physical G-Key (F9 / Fn+F9 / Super+G) shortcut..."
+python3 "$SCRIPT_DIR/dell_g15_fan_cli.py" --bind-gkey 2>/dev/null || true
+
 echo ""
 echo "=========================================================================="
 echo "[OK] Installation Complete!"
 echo "  * Launch GUI from Terminal    : dell-g15-fan (or ./main.py)"
 echo "  * Launch CLI Commands         : dell-g15-fan --status"
+echo "  * Toggle G-Mode Turbo         : Press F9, Fn+F9, or Super+G"
 echo "  * Application Menu Shortcut   : 'Dell G15 Fan Command Center' in App Launcher"
 echo "  * Setup Sysfs Permissions     : sudo ./setup_permissions.sh"
 echo "=========================================================================="

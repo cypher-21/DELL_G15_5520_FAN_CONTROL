@@ -8,7 +8,7 @@ import os
 import glob
 import subprocess
 import time
-from typing import Dict, Optional, Tuple, List, Any
+from typing import Dict, Optional, Tuple, List, Any, Callable
 import psutil
 
 
@@ -121,6 +121,42 @@ class DellFanBackend:
                 
         if not self.available_profiles:
             self.available_profiles = ["quiet", "balanced", "performance"]
+
+        # Power source adaptation callback
+        self._last_ac_online: Optional[bool] = None
+        self.on_power_source_change: Optional[Callable[[bool], None]] = None
+        self.auto_power_switch_enabled: bool = False
+
+    @staticmethod
+    def send_osd_notification(title: str, message: str, urgency: str = "normal", icon: Optional[str] = None):
+        """
+        Send a native desktop OSD notification using notify-send or gdbus.
+        Urgency options: 'low', 'normal', 'critical'.
+        """
+        if icon is None:
+            icon_path = os.path.expanduser("~/.local/share/icons/hicolor/256x256/apps/dell-g15-fan.png")
+            icon = icon_path if os.path.isfile(icon_path) else "dialog-information"
+
+        # Try notify-send first
+        try:
+            cmd = ["notify-send", "-a", "Dell G15 Fan Control", "-u", urgency, "-i", icon, title, message]
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+            return
+        except Exception:
+            pass
+
+        # Fallback to gdbus freedesktop notification call
+        try:
+            bus_cmd = [
+                "gdbus", "call", "--session",
+                "--dest", "org.freedesktop.Notifications",
+                "--object-path", "/org/freedesktop/Notifications",
+                "--method", "org.freedesktop.Notifications.Notify",
+                "Dell G15 Fan Control", "0", icon, title, message, "[]", "{}", "3000"
+            ]
+            subprocess.run(bus_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+        except Exception:
+            pass
 
     def _read_int(self, path: str, default: int = 0) -> int:
         """Safely read an integer from a sysfs file."""
@@ -322,6 +358,23 @@ class DellFanBackend:
             if bat_curr_ua > 0:
                 # Wattage = Volts * Amps
                 data["battery_rate_w"] = round((bat_volt_uv * bat_curr_ua) / 1_000_000_000_000.0, 1)
+
+        # Check AC status transition
+        if self._last_ac_online is not None and self._last_ac_online != data["is_ac_online"]:
+            is_ac = data["is_ac_online"]
+            if self.on_power_source_change:
+                try:
+                    self.on_power_source_change(is_ac)
+                except Exception:
+                    pass
+            if self.auto_power_switch_enabled:
+                if is_ac:
+                    self.set_thermal_profile("balanced")
+                    self.send_osd_notification("Power Source: AC Connected", "Engaged Balanced Thermal Profile", "normal")
+                else:
+                    self.set_thermal_profile("quiet")
+                    self.send_osd_notification("Power Source: Battery Active", "Engaged Quiet Battery-Saver Profile", "normal")
+        self._last_ac_online = data["is_ac_online"]
 
         return data
 

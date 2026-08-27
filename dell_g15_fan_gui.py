@@ -16,6 +16,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QTimer, QPointF, QRectF
 from PyQt6.QtGui import QColor, QPainter, QPen, QBrush, QFont, QLinearGradient, QPainterPath, QIcon
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from dell_fan_backend import DellFanBackend
 from fan_curve_engine import FanCurveEngine
@@ -698,12 +699,19 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
         c_title = QtWidgets.QLabel("MANUAL FAN BOOST CONTROL")
         c_title.setStyleSheet(f"color: {COLOR_TEXT_MUTED}; font-size: 12px; font-weight: bold; font-family: 'DejaVu Sans Mono';")
         
+        self.chk_auto_power = QtWidgets.QCheckBox("AUTO AC/BATTERY")
+        self.chk_auto_power.setChecked(True)
+        self.chk_auto_power.setToolTip("Automatically switch to Quiet on Battery and Balanced on AC Main")
+        self.chk_auto_power.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 11px; font-family: 'DejaVu Sans Mono'; font-weight: bold;")
+        self.chk_auto_power.toggled.connect(self._on_auto_power_toggled)
+
         self.chk_sync_fans = QtWidgets.QCheckBox("SYNCHRONIZE CHANNELS")
         self.chk_sync_fans.setChecked(True)
-        self.chk_sync_fans.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 12px; font-weight: bold;")
+        self.chk_sync_fans.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 11px; font-family: 'DejaVu Sans Mono'; font-weight: bold;")
         
         c_top.addWidget(c_title)
         c_top.addStretch()
+        c_top.addWidget(self.chk_auto_power)
         c_top.addWidget(self.chk_sync_fans)
         ctrl_layout.addLayout(c_top)
 
@@ -1174,6 +1182,10 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
     # -------------------------------------------------------------------------
     # Mode & Fan Actions
     # -------------------------------------------------------------------------
+    def _on_auto_power_toggled(self, checked: bool):
+        self.backend.auto_power_switch_enabled = checked
+        self.status_bar_label.setText(f"AUTO POWER-SOURCE ADAPTATION: {'ACTIVE' if checked else 'DISABLED'}")
+
     def _set_mode(self, mode: str):
         if self.curve_engine.is_running:
             self.curve_engine.stop()
@@ -1182,13 +1194,16 @@ class DellG15MainWindow(QtWidgets.QMainWindow):
 
         self.backend.set_thermal_profile(mode)
         self.status_bar_label.setText(f"PROFILE APPLIED: {mode.upper()}")
+        DellFanBackend.send_osd_notification("Dell G15 Thermal Profile", f"Switched to {mode.upper()} mode", "normal")
         self.refresh_telemetry()
 
     def _toggle_gmode(self):
         telem = self.backend.get_telemetry()
         new_state = not telem["is_g_mode"]
         self.backend.set_g_mode(new_state)
-        self.status_bar_label.setText(f"G-MODE TURBO: {'ENGAGED (100% Fans)' if new_state else 'DISENGAGED (Balanced)'}")
+        msg = "G-MODE TURBO: ENGAGED (100% Max Fans)" if new_state else "G-MODE TURBO: DISENGAGED (Balanced)"
+        self.status_bar_label.setText(msg)
+        DellFanBackend.send_osd_notification("Dell G15: Game Shift (G-Key)", msg, "critical" if new_state else "normal")
         self.refresh_telemetry()
 
     def _apply_slider_preset(self, pct: int):
@@ -1303,9 +1318,38 @@ def create_qapplication():
 def main():
     app = create_qapplication()
     app.setApplicationName("Dell G15 Fan Command Center")
-    
+
+    # Single-instance enforcement to prevent duplicate tray icons and duplicate polling loops
+    socket_name = "DellG15FanControllerSingleInstanceSocket"
+    socket = QLocalSocket()
+    socket.connectToServer(socket_name)
+    if socket.waitForConnected(300):
+        # Existing instance found! Send message to bring its window to the front
+        socket.write(b"SHOW\n")
+        socket.waitForBytesWritten(300)
+        socket.disconnectFromServer()
+        sys.exit(0)
+
+    # Primary instance: create server
+    local_server = QLocalServer()
+    local_server.removeServer(socket_name)
+    local_server.listen(socket_name)
+
     backend = DellFanBackend()
     window = DellG15MainWindow(backend)
+
+    def handle_new_instance():
+        sock = local_server.nextPendingConnection()
+        if sock:
+            def on_read():
+                data = sock.readAll().data().decode().strip()
+                if "SHOW" in data:
+                    window.showNormal()
+                    window.raise_()
+                    window.activateWindow()
+            sock.readyRead.connect(on_read)
+
+    local_server.newConnection.connect(handle_new_instance)
     window.show()
 
     sys.exit(app.exec())

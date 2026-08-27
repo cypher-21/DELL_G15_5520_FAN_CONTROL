@@ -52,6 +52,8 @@ class FanCurveEngine:
         self.hysteresis_temp: float = 2.0   # degree C buffer to prevent rapid fluctuating
         self._last_applied_pct: int = 0
         self._last_highest_temp: float = 0.0
+        self._high_temp_count: int = 0
+        self._last_alert_ts: float = 0.0
         
         # Callback for telemetry updates
         self.on_update_callback: Optional[Callable[[Dict], None]] = None
@@ -118,6 +120,20 @@ class FanCurveEngine:
                 telemetry = self.backend.get_telemetry()
                 highest_temp = max(telemetry.get("cpu_temp", 0.0), telemetry.get("gpu_temp", 0.0))
                 
+                # Check Thermal Surge Safety (>95 deg C for 5 consecutive cycles)
+                if highest_temp >= 95.0:
+                    self._high_temp_count += 1
+                    now = time.time()
+                    if self._high_temp_count >= 5 and (now - self._last_alert_ts > 60.0):
+                        self.backend.send_osd_notification(
+                            "Thermal Warning: High Temperatures",
+                            f"System temperature reached {highest_temp:.1f} deg C. Fans ramping to max cooling.",
+                            urgency="critical"
+                        )
+                        self._last_alert_ts = now
+                else:
+                    self._high_temp_count = 0
+
                 # Check hysteresis: only adjust fan if temp shifted by hysteresis_temp or if temp increased
                 target_fan_pct = self.calculate_fan_pct(highest_temp)
                 
